@@ -1,0 +1,76 @@
+{
+  "placeholderImages": [
+    {
+      "id": "cow1",
+      "description": "A brown cow in a field",
+      "imageUrl": "https://images.unsplash.com/photo-1600609293444-9a75b9ed8652?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxicm93biUyMGNvd3xlbnwwfHx8fDE3NjIwNTMwMzF8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "brown cow"
+    },
+    {
+      "id": "cow2",
+      "description": "A black and white cow",
+      "imageUrl": "https://images.unsplash.com/photo-1734109622927-c4655944adb4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxIRiUyMGNvd3xlbnwwfHx8fDE3NjIwNTg5NzJ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "HF cow"
+    },
+    {
+      "id": "ox1",
+      "description": "An ox pulling a cart",
+      "imageUrl": "https://images.unsplash.com/photo-1746037514162-19d32340a698?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxveCUyMGNhcnR8ZW58MHx8fHwxNzYyMDU4OTcyfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "ox cart"
+    },
+    {
+      "id": "buffalo1",
+      "description": "A buffalo in the water",
+      "imageUrl": "https://images.unsplash.com/photo-1517036263620-3da0cecd5271?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHx3YXRlciUyMGJ1ZmZhbG98ZW58MHx8fHwxNzYyMDI4OTMzfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "water buffalo"
+    },
+    {
+      "id": "hen1",
+      "description": "A hen in a coop",
+      "imageUrl": "https://images.unsplash.com/photo-1618346146499-5a503b5e4893?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxjaGlja2VuJTIwY29vcHxlbnwwfHx8fDE3NjIwNTg5NzJ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "chicken coop"
+    },
+    {
+      "id": "dog1",
+      "description": "A german shepherd dog",
+      "imageUrl": "https://images.unsplash.com/photo-1605725657590-b2cf0d31b1a5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxnZXJtYW4lMjBzaGVwaGVyZHxlbnwwfHx8fDE3NjIwNTg5NzJ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "german shepherd"
+    },
+    {
+      "id": "cat1",
+      "description": "A persian cat",
+      "imageUrl": "https://images.unsplash.com/photo-1582479541280-cd39734b8490?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxwZXJzaWFuJTIwY2F0fGVufDB8fHx8MTc2MjA1ODk3Mnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "persian cat"
+    },
+    {
+      "id": "pig1",
+      "description": "A pig in the mud",
+      "imageUrl": "https://images.unsplash.com/photo-1636581563722-107ba7a408ad?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxwaWclMjBtdWR8ZW58MHx8fHwxNzYyMDI4OTMzfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "pig mud"
+    },
+    {
+      "id": "cow3",
+      "description": "A Sahiwal cow",
+      "imageUrl": "https://images.unsplash.com/photo-1695902878213-f555035ac175?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxzYWhpd2FsJTIwY293fGVufDB8fHx8MTc2MjA1ODk3Mnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "sahiwal cow"
+    },
+    {
+      "id": "buffalo2",
+      "description": "A Murrah buffalo",
+      "imageUrl": "https://images.unsplash.com/photo-1644984284463-e0bddd5cb49b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxtdXJyYWglMjBidWZmYWxvfGVufDB8fHx8MTc2MjA1ODk3Mnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "murrah buffalo"
+    },
+    {
+      "id": "dog2",
+      "description": "A labrador dog",
+      "imageUrl": "https://images.unsplash.com/photo-1692713456114-798f4e1ba740?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxsYWJyYWRvciUyMGRvZ3xlbnwwfHx8fDE3NjIwNTg5NzJ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "labrador dog"
+    },
+    {
+      "id": "hen2",
+      "description": "A country hen",
+      "imageUrl": "https://images.unsplash.com/photo-1617077890517-42c3adf64770?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxjb3VudHJ5JTIwaGVufGVufDB8fHx8MTc2MjA1ODk3Mnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "country hen"
+    }
+  ]
+}

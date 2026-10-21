@@ -1,0 +1,7 @@
+{
+  "name": "Animal Bazaar",
+  "description": "Animal Bazaar - Buy and Sell Animals online with AI-assisted livestock verification.",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
