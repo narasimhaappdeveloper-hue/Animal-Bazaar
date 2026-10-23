@@ -21,6 +21,7 @@ export default function ForgotPasswordPage() {
   const { toast } = useToast();
   const router = useRouter();
 
+  // దశలు: phone -> otp -> new-password
   const [step, setStep] = useState<'phone' | 'otp' | 'new-password'>('phone');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
@@ -29,19 +30,17 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
 
-  // Invisible reCAPTCHA initialization
+  // Invisible Recaptcha సెటప్
   const setupRecaptcha = () => {
     if (!window.recaptchaVerifier) {
       window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
         size: 'invisible',
-        callback: () => {
-          // reCAPTCHA solved automatically
-        },
+        callback: () => {},
       });
     }
   };
 
-  // 1. ఫోన్ నంబర్‌కి OTP పంపడం
+  // 1. మొబైల్ నంబర్‌కి OTP పంపడం
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phoneNumber || phoneNumber.length < 10) {
@@ -72,7 +71,7 @@ export default function ForgotPasswordPage() {
       toast({
         variant: 'destructive',
         title: 'OTP పంపడం విఫలమైంది',
-        description: error.message || 'Firebase లో Phone Auth ఎనేబుల్ అయిందో లేదో తనిఖీ చేయండి.',
+        description: error.message || 'దయచేసి Firebase లో Phone Auth ఎనేబుల్ అయిందో లేదో చూడండి.',
       });
     } finally {
       setLoading(false);
@@ -98,7 +97,7 @@ export default function ForgotPasswordPage() {
         setStep('new-password');
         toast({
           title: 'OTP వెరిఫై అయ్యింది ✓',
-          description: 'ఇప్పుడు మీ కొత్త పాస్‌వర్డ్‌ను సెట్ చేయండి.',
+          description: 'ఇప్పుడు మీ కొత్త పాస్‌వర్డ్‌ను సెట్ చేసుకోండి.',
         });
       }
     } catch (error: any) {
@@ -129,7 +128,7 @@ export default function ForgotPasswordPage() {
       toast({
         variant: 'destructive',
         title: 'పాస్‌వర్డ్ సరిపోలలేదు',
-        description: 'రెండు ఫీల్డ్స్‌లో ఒకే పాస్‌వర్డ్ ఇవ్వండి.',
+        description: 'రెండు ఫీల్డ్స్‌లో ఒకే పాస్‌వర్డ్ నమోదు చేయండి.',
       });
       return;
     }
@@ -140,7 +139,7 @@ export default function ForgotPasswordPage() {
       if (currentUser) {
         await updatePassword(currentUser, newPassword);
         toast({
-          title: 'పాస్‌వర్డ్ అప్‌డేట్ అయ్యింది! ✓',
+          title: 'పాస్‌వర్డ్ విజయవంతంగా మారింది! ✓',
           description: 'మీ కొత్త పాస్‌వర్డ్‌తో లాగిన్ అవ్వండి.',
         });
         router.push('/login');
@@ -169,15 +168,15 @@ export default function ForgotPasswordPage() {
           <div className="mx-auto h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-1">
             <KeyRound className="h-6 w-6" />
           </div>
-          <CardTitle className="text-2xl font-bold">Reset Password</CardTitle>
+          <CardTitle className="text-2xl font-bold">పాస్‌వర్డ్ రీసెట్</CardTitle>
           <CardDescription>
-            {step === 'phone' && 'మొబైల్ నంబర్ ద్వారా SMS OTP పొందండి'}
-            {step === 'otp' && 'మీ ఫోన్‌కు వచ్చిన 6 అంకెల కోడ్ ఇవ్వండి'}
-            {step === 'new-password' && 'మీ కొత్త పాస్‌వర్డ్‌ను నమోదు చేయండి'}
+            {step === 'phone' && 'మొబైల్ నంబర్ నమోదు చేసి OTP పొందండి'}
+            {step === 'otp' && 'మీ ఫోన్‌కు వచ్చిన 6 అంకెల OTP ని నమోదు చేయండి'}
+            {step === 'new-password' && 'మీ కొత్త పాస్‌వర్డ్‌ను సెట్ చేయండి'}
           </CardDescription>
         </CardHeader>
 
-        {/* STEP 1: PHONE NUMBER FORM */}
+        {/* దశ 1: మొబైల్ నంబర్ బాక్స్ */}
         {step === 'phone' && (
           <form onSubmit={handleSendOtp}>
             <CardContent className="grid gap-4">
@@ -204,14 +203,14 @@ export default function ForgotPasswordPage() {
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    SMS పంపుతోంది...
+                    OTP పంపుతోంది...
                   </>
                 ) : (
-                  'Send OTP (OTP పంపండి)'
+                  'OTP పంపండి (Send OTP)'
                 )}
               </Button>
               <div className="text-center text-sm pt-2">
-                గుర్తుందా?{' '}
+                పాస్‌వర్డ్ గుర్తుందా?{' '}
                 <Link href="/login" className="underline text-primary font-medium">
                   లాగిన్ అవ్వండి
                 </Link>
@@ -220,12 +219,12 @@ export default function ForgotPasswordPage() {
           </form>
         )}
 
-        {/* STEP 2: OTP VERIFICATION FORM */}
+        {/* దశ 2: OTP ఎంటర్ చేసే బాక్స్ */}
         {step === 'otp' && (
           <form onSubmit={handleVerifyOtp}>
             <CardContent className="grid gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="otp">6 అంకెల OTP నమోదు చేయండి</Label>
+                <Label htmlFor="otp">6 అంకెల OTP ఇవ్వండి</Label>
                 <Input
                   id="otp"
                   type="text"
@@ -248,7 +247,7 @@ export default function ForgotPasswordPage() {
                 ) : (
                   <>
                     <CheckCircle2 className="mr-2 h-4 w-4" />
-                    Verify OTP
+                    OTP సరిచూడండి
                   </>
                 )}
               </Button>
@@ -257,13 +256,13 @@ export default function ForgotPasswordPage() {
                 onClick={() => setStep('phone')}
                 className="text-xs text-muted-foreground hover:underline text-center mt-1"
               >
-                తప్పు నంబరా? (మళ్లీ నంబర్ ఇవ్వండి)
+                తప్పు నంబరా? (మళ్లీ నంబర్ మార్చండి)
               </button>
             </CardFooter>
           </form>
         )}
 
-        {/* STEP 3: NEW PASSWORD FORM */}
+        {/* దశ 3: కొత్త పాస్‌వర్డ్ ఎంటర్ చేసే బాక్స్ */}
         {step === 'new-password' && (
           <form onSubmit={handleUpdatePassword}>
             <CardContent className="grid gap-4">
@@ -306,7 +305,7 @@ export default function ForgotPasswordPage() {
                 ) : (
                   <>
                     <ShieldCheck className="mr-2 h-4 w-4" />
-                    పాస్‌వర్డ్ మార్చండి
+                    కొత్త పాస్‌వర్డ్ సెట్ చేయండి
                   </>
                 )}
               </Button>
@@ -318,7 +317,7 @@ export default function ForgotPasswordPage() {
   );
 }
 
-// Global TypeScript declaration for RecaptchaVerifier
+// Window object కు RecaptchaVerifier టైప్ డిక్లరేషన్
 declare global {
   interface Window {
     recaptchaVerifier: any;
