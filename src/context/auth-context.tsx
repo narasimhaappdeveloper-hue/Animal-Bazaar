@@ -1,112 +1,95 @@
 'use client';
-import type { User } from '@/lib/definitions';
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 
-const createMockUser = (phone: string): User => ({
-  uid: 'mock-user-123',
-  name: 'Demo User',
-  email: 'demo.user@example.com',
-  phone: phone,
-  createdAt: Date.now(),
-  lastActive: Date.now(),
-});
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { User, onAuthStateChanged, signOut as fbSignOut } from 'firebase/auth';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
 
-export interface RegisterUserData {
-  name: string;
+export interface UserProfile {
+  uid: string;
   phone: string;
-  email?: string;
-  state?: string;
+  name: string;
   location?: string;
-  village?: string;
-  pincode?: string;
+  role: 'buyer' | 'seller' | 'both';
+  createdAt?: any;
 }
 
 interface AuthContextType {
-  user: User | null;
-  login: (phone: string, name?: string, email?: string) => void;
-  registerUser: (data: RegisterUserData) => void;
-  logout: () => void;
+  user: UserProfile | null;
+  firebaseUser: User | null;
   loading: boolean;
+  signOut: () => Promise<void>;
+  refreshUserProfile: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | null>(null);
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  firebaseUser: null,
+  loading: true,
+  signOut: async () => {},
+  refreshUserProfile: async () => {},
+});
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
 
-  useEffect(() => {
+  const fetchProfile = async (uid: string, phone: string) => {
     try {
-      const storedUser = localStorage.getItem('user');
+      const userDocRef = doc(db, 'users', uid);
+      const userSnap = await getDoc(userDocRef);
 
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
+      if (userSnap.exists()) {
+        setUser(userSnap.data() as UserProfile);
+      } else {
+        // కొత్త యూజర్ అయితే బేసిక్ ప్రొఫైల్ తయారు చేయడం
+        const newProfile: UserProfile = {
+          uid,
+          phone,
+          name: 'Farmer/User',
+          role: 'both',
+          createdAt: serverTimestamp(),
+        };
+        await setDoc(userDocRef, newProfile);
+        setUser(newProfile);
       }
     } catch (error) {
-      console.error('Failed to load user from localStorage:', error);
-    } finally {
-      setLoading(false);
+      console.error('Error fetching user profile:', error);
     }
+  };
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currUser) => {
+      setFirebaseUser(currUser);
+      if (currUser && currUser.phoneNumber) {
+        await fetchProfile(currUser.uid, currUser.phoneNumber);
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const login = (phone: string, name?: string, email?: string) => {
-    try {
-      const newUser = createMockUser(phone);
-      if (name) newUser.name = name;
-      if (email) newUser.email = email;
-      localStorage.setItem('user', JSON.stringify(newUser));
-      setUser(newUser);
-      router.push('/');
-    } catch (error) {
-      console.error('Failed to save user to localStorage during login:', error);
-    }
+  const signOut = async () => {
+    await fbSignOut(auth);
+    setUser(null);
+    setFirebaseUser(null);
   };
 
-  const registerUser = (data: RegisterUserData) => {
-    try {
-      const newUser: User = {
-        uid: 'user-' + Date.now(),
-        name: data.name.trim(),
-        phone: data.phone.trim(),
-        email: data.email?.trim() || '',
-        state: data.state,
-        location: data.location,
-        village: data.village?.trim(),
-        pincode: data.pincode?.trim(),
-        createdAt: Date.now(),
-        lastActive: Date.now(),
-      };
-      localStorage.setItem('user', JSON.stringify(newUser));
-      setUser(newUser);
-      router.push('/');
-    } catch (error) {
-      console.error('Failed to register user to localStorage:', error);
-    }
-  };
-
-  const logout = () => {
-    try {
-      setUser(null);
-      localStorage.removeItem('user');
-      router.push('/login');
-    } catch (error) {
-      console.error('Failed to remove user from localStorage during logout:', error);
+  const refreshUserProfile = async () => {
+    if (firebaseUser && firebaseUser.phoneNumber) {
+      await fetchProfile(firebaseUser.uid, firebaseUser.phoneNumber);
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, registerUser, logout, loading }}>
+    <AuthContext.Provider value={{ user, firebaseUser, loading, signOut, refreshUserProfile }}>
       {children}
     </AuthContext.Provider>
   );
-}
+};
 
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-}
+export const useAuth = () => useContext(AuthContext);
