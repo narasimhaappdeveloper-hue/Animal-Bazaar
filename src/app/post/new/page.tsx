@@ -37,7 +37,6 @@ export default function NewPostPage() {
   const [description, setDescription] = useState('');
   const [descriptionError, setDescriptionError] = useState('');
 
-  // Image Upload & Validation States
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isVerifyingImage, setIsVerifyingImage] = useState(false);
