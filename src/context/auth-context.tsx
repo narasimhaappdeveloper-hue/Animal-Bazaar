@@ -34,16 +34,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
+
+  // 1. క్లయింట్ బ్రౌజర్ పూర్తిగా మౌంట్ అయ్యే వరకు ఆగడం (Hydration mismatch నివారిస్తుంది)
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const fetchProfile = async (uid: string, phone: string) => {
     try {
+      if (!db) return;
       const userDocRef = doc(db, 'users', uid);
       const userSnap = await getDoc(userDocRef);
 
       if (userSnap.exists()) {
         setUser(userSnap.data() as UserProfile);
       } else {
-        // కొత్త యూజర్ అయితే బేసిక్ ప్రొఫైల్ తయారు చేయడం
         const newProfile: UserProfile = {
           uid,
           phone,
@@ -60,6 +66,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
+    // auth లేకపోతే క్రాష్ అవ్వకుండా నిరోధించడం
+    if (!auth) {
+      setLoading(false);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (currUser) => {
       setFirebaseUser(currUser);
       if (currUser && currUser.phoneNumber) {
@@ -74,9 +86,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const signOut = async () => {
-    await fbSignOut(auth);
-    setUser(null);
-    setFirebaseUser(null);
+    try {
+      if (auth) {
+        await fbSignOut(auth);
+      }
+      setUser(null);
+      setFirebaseUser(null);
+    } catch (error) {
+      console.error('Signout error:', error);
+    }
   };
 
   const refreshUserProfile = async () => {
@@ -84,6 +102,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       await fetchProfile(firebaseUser.uid, firebaseUser.phoneNumber);
     }
   };
+
+  // క్లయింట్ మౌంట్ కాకముందు క్రాష్ రాకుండా ఖాళీ లేదా సురక్షిత వ్యూ ఇవ్వడం
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <AuthContext.Provider value={{ user, firebaseUser, loading, signOut, refreshUserProfile }}>
