@@ -90,7 +90,7 @@ export default function NewPostPage() {
           setSelectedFile(null);
           if (fileInputRef.current) fileInputRef.current.value = '';
         } else {
-          setSelectedFile(file); // Store the actual file for Firebase Storage
+          setSelectedFile(file);
         }
       } catch (error) {
         console.error('Image validation error:', error);
@@ -153,7 +153,7 @@ export default function NewPostPage() {
       return;
     }
 
-    if (!selectedFile || isVerifyingImage || !!imageValidationError) {
+    if (!selectedFile || isVerifyingImage || Boolean(imageValidationError)) {
       toast({
         variant: 'destructive',
         title: 'Valid Animal Photo Required',
@@ -192,7 +192,6 @@ export default function NewPostPage() {
     setIsSubmitting(true);
 
     try {
-      // 1. Upload original photo to Firebase Cloud Storage
       const fileExt = selectedFile.name.split('.').pop() || 'jpg';
       const storagePath = `animals/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
       const storageRef = ref(storage, storagePath);
@@ -215,10 +214,8 @@ export default function NewPostPage() {
           });
         },
         async () => {
-          // 2. Retrieve real public download URL
           const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
 
-          // 3. Save post data into Cloud Firestore
           await addDoc(collection(db, 'animals'), {
             title: title.trim(),
             category: category,
@@ -258,7 +255,7 @@ export default function NewPostPage() {
     }
   };
 
-  const isSubmitDisabled = isVerifyingImage || !!imageValidationError || !imagePreview || isSubmitting;
+  const isSubmitDisabled = isVerifyingImage || Boolean(imageValidationError) || !imagePreview || isSubmitting;
 
   if (!user) {
     return (
@@ -276,7 +273,6 @@ export default function NewPostPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="postCategory">Animal Type</Label>
@@ -295,3 +291,212 @@ export default function NewPostPage() {
                     {animalCategories.map((cat) => (
                       <SelectItem key={cat} value={cat}>
                         {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="postBreed">Breed</Label>
+                <Select
+                  name="breed"
+                  value={selectedBreed}
+                  onValueChange={setSelectedBreed}
+                  disabled={!selectedCategory}
+                  required
+                >
+                  <SelectTrigger id="postBreed">
+                    <SelectValue placeholder="Select Breed" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {selectedCategory &&
+                      breeds[selectedCategory].map((b) => (
+                        <SelectItem key={b} value={b}>
+                          {b}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {selectedBreed === 'Other' && (
+              <div className="space-y-2">
+                <Label htmlFor="otherBreed">Please specify breed</Label>
+                <Input id="otherBreed" name="otherBreed" placeholder="Enter breed name" required />
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="postState">State</Label>
+                <Select name="state" onValueChange={(value) => setSelectedState(value as State)} required>
+                  <SelectTrigger id="postState">
+                    <SelectValue placeholder="Select State" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {states.map((st) => (
+                      <SelectItem key={st} value={st}>
+                        {st}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="postLocation">District</Label>
+                <Select name="location" required disabled={!selectedState}>
+                  <SelectTrigger id="postLocation">
+                    <SelectValue placeholder="Select District" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {districts.map((district, index) => (
+                      <SelectItem key={`${district}-${index}`} value={district}>
+                        {district}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="postPrice">Price (₹)</Label>
+                <Input
+                  name="price"
+                  id="postPrice"
+                  type="number"
+                  placeholder="e.g., 75000"
+                  value={price}
+                  onChange={handlePriceChange}
+                  required
+                />
+                {priceError && <p className="text-sm font-medium text-destructive">{priceError}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Age</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Select name="ageYears" value={selectedYears} onValueChange={setSelectedYears}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Years" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 31 }, (_, i) => i).map((year) => (
+                        <SelectItem key={year} value={String(year)}>
+                          {year} year{year !== 1 ? 's' : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select name="ageMonths" value={selectedMonths} onValueChange={setSelectedMonths}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Months" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 12 }, (_, i) => i).map((month) => (
+                        <SelectItem key={month} value={String(month)}>
+                          {month} month{month !== 1 ? 's' : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="postDesc">Description</Label>
+              <Textarea
+                name="description"
+                id="postDesc"
+                placeholder="Details: Vaccinated, milk yield, weight, health conditions..."
+                rows={4}
+                value={description}
+                onChange={handleDescriptionChange}
+                required
+              />
+              {descriptionError && <p className="text-sm font-medium text-destructive">{descriptionError}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="postImage">Animal Photo</Label>
+              <div className="relative h-56 w-full rounded-md border-2 border-dashed border-border flex items-center justify-center bg-muted/40 overflow-hidden">
+                {imagePreview && (
+                  <div className="relative w-full h-full">
+                    <Image src={imagePreview} alt="Preview" fill className="object-contain rounded-md" />
+                  </div>
+                )}
+
+                {isVerifyingImage && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <p className="mt-2 text-sm text-muted-foreground font-medium">AI verifies animal in image...</p>
+                  </div>
+                )}
+
+                {!imagePreview && !isVerifyingImage && (
+                  <div className="text-center text-muted-foreground p-4">
+                    <UploadCloud className="mx-auto h-12 w-12 text-primary/70" />
+                    <p className="mt-2 text-sm font-medium">Click below to upload animal photo</p>
+                    <p className="text-xs text-muted-foreground">AI automatically verifies that the image contains an animal.</p>
+                  </div>
+                )}
+              </div>
+
+              <Input
+                ref={fileInputRef}
+                name="image"
+                id="postImage"
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                required
+                className="mt-2"
+              />
+
+              {imageValidationError && (
+                <Alert variant="destructive" className="mt-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>Image Rejected</AlertTitle>
+                  <AlertDescription>{imageValidationError}</AlertDescription>
+                </Alert>
+              )}
+            </div>
+
+            <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur border-t p-4 z-20 max-w-2xl mx-auto shadow-md">
+              <div className="flex gap-4">
+                <Button
+                  type="submit"
+                  className="flex-1 font-semibold py-6 text-base"
+                  disabled={isSubmitDisabled}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Uploading & Posting ({uploadProgress}%)...
+                    </>
+                  ) : isVerifyingImage ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Verifying Image...
+                    </>
+                  ) : (
+                    'Post Animal'
+                  )}
+                </Button>
+                <Button type="button" variant="outline" className="py-6" onClick={() => router.back()}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
