@@ -74,7 +74,11 @@ export default function RegisterPage() {
     return () => clearTimeout(timer);
   }, [countdown]);
 
-  const handlePinLookup = async (pinToVerify: string, preferredVillage?: string) => {
+  const handlePinLookup = async (
+    pinToVerify: string,
+    preferredVillage?: string,
+    preferredDistrict?: string
+  ) => {
     const clean = pinToVerify.replace(/\D/g, '').slice(0, 6);
     setPincode(clean);
 
@@ -105,13 +109,14 @@ export default function RegisterPage() {
 
     setIsPinVerified(true);
     setVerifiedState(result.state);
-    setVerifiedDistrict(result.district);
     setPostOffices(result.postOffices);
 
     const matchedOffice =
       preferredVillage &&
       result.postOffices.find((po) => po.Name.toLowerCase() === preferredVillage.toLowerCase());
-    setSelectedVillage(matchedOffice ? matchedOffice.Name : result.postOffices[0]?.Name || '');
+    const chosenOffice = matchedOffice || result.postOffices[0];
+    setSelectedVillage(chosenOffice?.Name || '');
+    setVerifiedDistrict(preferredDistrict || chosenOffice?.District || result.district);
   };
 
   const handleUseGpsLocation = async () => {
@@ -169,7 +174,16 @@ export default function RegisterPage() {
       if (cached) {
         const parsed = JSON.parse(cached);
         if (parsed?.pincode && /^[1-9][0-9]{5}$/.test(parsed.pincode)) {
-          handlePinLookup(parsed.pincode, parsed.village);
+          if (Array.isArray(parsed.postOffices) && parsed.postOffices.length > 0 && parsed.district) {
+            setPincode(parsed.pincode);
+            setPostOffices(parsed.postOffices);
+            setVerifiedState(parsed.state || '');
+            setVerifiedDistrict(parsed.district);
+            setSelectedVillage(parsed.village || parsed.postOffices[0].Name);
+            setIsPinVerified(true);
+          } else {
+            handlePinLookup(parsed.pincode, parsed.village, parsed.district);
+          }
         }
       }
     } catch (e) {
@@ -583,7 +597,13 @@ export default function RegisterPage() {
                   </Label>
                   <Select
                     value={selectedVillage}
-                    onValueChange={setSelectedVillage}
+                    onValueChange={(val) => {
+                      setSelectedVillage(val);
+                      const po = postOffices.find((item) => item.Name === val);
+                      if (po?.District) {
+                        setVerifiedDistrict(po.District);
+                      }
+                    }}
                     disabled={!isPinVerified || postOffices.length === 0}
                     required
                   >

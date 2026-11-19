@@ -1,35 +1,83 @@
 'use server';
 
-/**
- * @fileOverview A Genkit flow to validate if an image contains an animal and does not feature humans.
- *
- * - validateAnimalImage - A function that analyzes an image and determines if it contains an animal as the main subject.
- * - ValidateAnimalImageInput - The input type for the validateAnimalImage function.
- * - ValidateAnimalImageOutput - The return type for the validateAnimalImage function.
- */
+import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+export interface ValidateAnimalImageInput {
+  photoDataUri: string;
+}
 
-const ValidateAnimalImageInputSchema = z.object({
-  photoDataUri: z
-    .string()
-    .describe(
-      "A photo, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
-    ),
-});
-export type ValidateAnimalImageInput = z.infer<typeof ValidateAnimalImageInputSchema>;
+export interface ValidateAnimalImageOutput {
+  containsAnimal: boolean;
+  reason: string;
+}
 
-const ValidateAnimalImageOutputSchema = z.object({
-  containsAnimal: z.boolean().describe('Whether or not the image contains an animal and is valid.'),
-  reason: z.string().describe('A brief explanation for the decision.'),
-});
-export type ValidateAnimalImageOutput = z.infer<typeof ValidateAnimalImageOutputSchema>;
+export async function validateAnimalImage(
+  input: ValidateAnimalImageInput
+): Promise<ValidateAnimalImageOutput> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return {
+      containsAnimal: false,
+      reason: 'Image verification service is unavailable.',
+    };
+  }
 
-export async function validateAnimalImage(input: ValidateAnimalImageInput): Promise<ValidateAnimalImageOutput> {
+  const matches = input.photoDataUri.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!matches || matches.length !== 3) {
+    return {
+      containsAnimal: false,
+      reason: 'Invalid image format.',
+    };
+  }
+
   try {
-    const result = await validateAnimalImageFlow(input);
-    return result;
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        },
+      },
+    });
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-4-hydrogen',
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              mimeType: matches[1],
+              data: matches[2],
+            },
+          },
+          {
+            text: 'Determine if this image clearly shows a real living animal as the main subject (and NOT humans, vehicles, documents, or non-animal objects). Return JSON with containsAnimal (boolean) and reason (string).',
+          },
+        ],
+      },
+      config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            containsAnimal: { type: Type.BOOLEAN },
+            reason: { type: Type.STRING },
+          },
+          required: ['containsAnimal', 'reason'],
+        },
+      },
+    });
+
+    const text = (response.text ?? '').trim();
+    if (!text) {
+      return { containsAnimal: false, reason: 'Could not verify an animal in the photo.' };
+    }
+    const parsed = JSON.parse(text) as ValidateAnimalImageOutput;
+    return {
+      containsAnimal: Boolean(parsed.containsAnimal),
+      reason: parsed.reason || 'Image verification completed.',
+    };
   } catch (error) {
     console.error('Image validation error:', error);
     return {
@@ -38,37 +86,3 @@ export async function validateAnimalImage(input: ValidateAnimalImageInput): Prom
     };
   }
 }
-
-const prompt = ai.definePrompt({
-  name: 'validateAnimalImagePrompt',
-  input: {schema: ValidateAnimalImageInputSchema},
-  output: {schema: ValidateAnimalImageOutputSchema},
-  prompt: `You are an image analysis expert for an animal marketplace. Your task is to determine if the provided image is suitable for a listing.
-
-Your rules are:
-1. The image MUST contain an animal (mammal, bird, fish, reptile, insect, etc.). The animal should be the main subject.
-2. The image MUST NOT feature any humans. If a person is clearly visible, the image is invalid.
-3. If the image meets both rules, set containsAnimal to true.
-4. If the image fails either rule, set containsAnimal to false and provide a clear reason. For example, "No animal detected in the image" or "Images with people are not allowed."
-
-Analyze the following photo and provide your decision.
-
-Photo: {{media url=photoDataUri}}`,
-});
-
-const validateAnimalImageFlow = ai.defineFlow(
-  {
-    name: 'validateAnimalImageFlow',
-    inputSchema: ValidateAnimalImageInputSchema,
-    outputSchema: ValidateAnimalImageOutputSchema,
-  },
-  async input => {
-    try {
-      const {output} = await prompt(input);
-      return output || { containsAnimal: false, reason: 'Could not verify an animal in the photo.' };
-    } catch (err) {
-      console.error('validateAnimalImageFlow execution error:', err);
-      return { containsAnimal: false, reason: 'Image verification failed.' };
-    }
-  }
-);

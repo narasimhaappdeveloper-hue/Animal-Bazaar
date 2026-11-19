@@ -41,13 +41,39 @@ export type NotificationItem = {
   userId: string;
   title: string;
   message: string;
-  type: 'inquiry' | 'call' | 'offer' | 'system';
+  type: 'inquiry' | 'call' | 'offer' | 'system' | 'call_request' | 'call_accepted' | 'call_rejected';
   createdAt: number;
   read: boolean;
   animalId?: string;
+  callRequestId?: string;
   senderName?: string;
-  senderPhone?: string;
   offerAmount?: number;
+};
+
+export type CallRequestStatus = 'pending' | 'accepted' | 'rejected';
+
+export type CallRequest = {
+  id: string;
+  animalId: string;
+  animalTitle: string;
+  sellerUid: string;
+  buyerUid: string;
+  buyerLabel: string;
+  status: CallRequestStatus;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type MaskedCallSession = {
+  id: string;
+  requestId: string;
+  animalId: string;
+  animalTitle: string;
+  callerUid: string;
+  calleeUid: string;
+  status: 'ringing' | 'connected' | 'ended';
+  startedAt: number;
+  connectedAt?: number;
 };
 
 export const breeds: Record<AnimalCategory, string[]> = {

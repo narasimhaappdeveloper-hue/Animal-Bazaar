@@ -1,98 +1,83 @@
 'use server';
 
-/**
- * @fileOverview This file defines a Genkit flow for suggesting similar animal listings based on a given animal listing.
- *
- * It exports:
- * - `suggestSimilarAnimals`: An async function that takes an animal listing as input and returns a list of similar animal listings.
- * - `SuggestSimilarAnimalsInput`: The TypeScript type definition for the input to the `suggestSimilarAnimals` function.
- * - `SuggestSimilarAnimalsOutput`: The TypeScript type definition for the output of the `suggestSimilarAnimals` function.
- */
+import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
-
-const SuggestSimilarAnimalsInputSchema = z.object({
-  category: z.string().describe('The category of the animal (e.g., Cow, Buffalo, Dog).'),
-  breed: z.string().describe('The breed of the animal (e.g., HF, Murrah, German Shepherd).'),
-  location: z.string().describe('The location where the animal is listed for sale.'),
-  title: z.string().describe('The title of the animal listing.'),
-  desc: z.string().describe('The description of the animal listing.'),
-});
-export type SuggestSimilarAnimalsInput = z.infer<typeof SuggestSimilarAnimalsInputSchema>;
-
-const SuggestSimilarAnimalsOutputSchema = z.array(
-  z.object({
-    title: z.string().describe('The title of the similar animal listing.'),
-    breed: z.string().describe('The breed of the similar animal.'),
-    location: z.string().describe('The location of the similar animal listing.'),
-    reason: z.string().describe('The reason why this animal is suggested as similar.'),
-  })
-).describe('A list of similar animal listings.');
-
-export type SuggestSimilarAnimalsOutput = z.infer<typeof SuggestSimilarAnimalsOutputSchema>;
-
-export async function suggestSimilarAnimals(input: SuggestSimilarAnimalsInput): Promise<SuggestSimilarAnimalsOutput> {
-  try {
-    const result = await suggestSimilarAnimalsFlow(input);
-    return result;
-  } catch (error) {
-    console.error('Suggest similar animals error:', error);
-    return [
-      {
-        title: `Pure ${input.breed} ${input.category}`,
-        breed: input.breed,
-        location: input.location,
-        reason: 'అదే జాతి మరియు సమీప ప్రాంతం (Similar breed and regional match)',
-      },
-    ];
-  }
+export interface SuggestSimilarAnimalsInput {
+  category: string;
+  breed: string;
+  location: string;
+  title: string;
+  desc: string;
 }
 
-const suggestSimilarAnimalsPrompt = ai.definePrompt({
-  name: 'suggestSimilarAnimalsPrompt',
-  input: {schema: SuggestSimilarAnimalsInputSchema},
-  output: {schema: SuggestSimilarAnimalsOutputSchema},
-  prompt: `You are an AI assistant that suggests similar animal listings based on a given animal listing.
+export interface SimilarAnimalSuggestion {
+  title: string;
+  breed: string;
+  location: string;
+  reason: string;
+}
 
-  Given the following animal listing:
+export type SuggestSimilarAnimalsOutput = SimilarAnimalSuggestion[];
 
-  Category: {{{category}}}
-  Breed: {{{breed}}}
-  Location: {{{location}}}
-  Title: {{{title}}}
-  Description: {{{desc}}}
+export async function suggestSimilarAnimals(
+  input: SuggestSimilarAnimalsInput
+): Promise<SuggestSimilarAnimalsOutput> {
+  const fallback: SuggestSimilarAnimalsOutput = [
+    {
+      title: `Pure ${input.breed} ${input.category}`,
+      breed: input.breed,
+      location: input.location,
+      reason: 'అదే జాతి మరియు సమీప ప్రాంతం (Similar breed and regional match)',
+    },
+  ];
 
-  Suggest a list of similar animal listings. For each suggested listing, include the title, breed, location, and a brief reason why it is similar to the given listing.
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return fallback;
 
-  Format your response as a JSON array of objects, where each object represents a similar animal listing and includes the following fields:
-  - title: The title of the similar animal listing.
-  - breed: The breed of the similar animal.
-  - location: The location of the similar animal listing.
-  - reason: A brief explanation of why this animal is similar to the given listing.
-  `,
-});
-
-const suggestSimilarAnimalsFlow = ai.defineFlow(
-  {
-    name: 'suggestSimilarAnimalsFlow',
-    inputSchema: SuggestSimilarAnimalsInputSchema,
-    outputSchema: SuggestSimilarAnimalsOutputSchema,
-  },
-  async input => {
-    try {
-      const {output} = await suggestSimilarAnimalsPrompt(input);
-      return output || [];
-    } catch (err) {
-      console.error('suggestSimilarAnimalsFlow execution error:', err);
-      return [
-        {
-          title: `Pure ${input.breed} in ${input.location}`,
-          breed: input.breed,
-          location: input.location,
-          reason: 'Matching regional breed',
+  try {
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
         },
-      ];
-    }
+      },
+    });
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-4-hydrogen',
+      contents: `You are an expert livestock marketplace advisor. Based on this listing, suggest 3 similar animal listings buyers in the same region might consider.
+
+Category: ${input.category}
+Breed: ${input.breed}
+Location: ${input.location}
+Title: ${input.title}
+Description: ${input.desc}`,
+      config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING, description: 'Title of the similar animal listing.' },
+              breed: { type: Type.STRING, description: 'Breed of the similar animal.' },
+              location: { type: Type.STRING, description: 'Region or district in India.' },
+              reason: { type: Type.STRING, description: 'Brief reason why this is a great similar option.' },
+            },
+            required: ['title', 'breed', 'location', 'reason'],
+          },
+        },
+      },
+    });
+
+    const text = (response.text ?? '').trim();
+    if (!text) return fallback;
+    const parsed = JSON.parse(text) as SuggestSimilarAnimalsOutput;
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : fallback;
+  } catch (error) {
+    console.error('Suggest similar animals error:', error);
+    return fallback;
   }
-);
+}

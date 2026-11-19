@@ -17,6 +17,7 @@ import { verifyAnimalPhotoStrict } from '@/lib/animal-verifier';
 import {
   verifyIndianPinCode,
   detectVerifiedGpsLocation,
+  areDistrictsMatching,
   type PostalOfficeItem,
 } from '@/lib/address-verifier';
 import { VERIFIED_LOCATION_STORAGE_KEY } from '@/components/permissions-onboarding';
@@ -31,6 +32,7 @@ import {
   ShieldCheck,
   XCircle,
   Navigation,
+  Lock,
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -49,13 +51,17 @@ export default function NewPostPage() {
   const [selectedMonths, setSelectedMonths] = useState('0');
   const [description, setDescription] = useState('');
 
-  // Verified Address State (No Fake Addresses Allowed)
+  // Profile-Locked District (User can ONLY post in the district selected when creating their profile)
+  const profileDistrict = user?.district?.trim() || '';
+  const profileState = (user?.state as State) || '';
+
+  // Verified Address State (No Fake Addresses & No Cross-District Posting Allowed)
   const [pincode, setPincode] = useState(user?.pincode || '');
   const [isVerifyingPin, setIsVerifyingPin] = useState(false);
   const [isPinVerified, setIsPinVerified] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
-  const [verifiedState, setVerifiedState] = useState<State | ''>((user?.state as State) || '');
-  const [verifiedDistrict, setVerifiedDistrict] = useState(user?.district || '');
+  const [verifiedState, setVerifiedState] = useState<State | ''>(profileState);
+  const [verifiedDistrict, setVerifiedDistrict] = useState(profileDistrict);
   const [postOffices, setPostOffices] = useState<PostalOfficeItem[]>([]);
   const [selectedVillage, setSelectedVillage] = useState(user?.village || '');
   const [isDetectingGps, setIsDetectingGps] = useState(false);
@@ -79,19 +85,34 @@ export default function NewPostPage() {
       return;
     }
 
-    // Pre-populate from user's verified pincode or cached GPS onboarding location
+    const lockedDist = user.district?.trim() || '';
+    const lockedSt = (user.state as State) || '';
+    if (lockedDist) setVerifiedDistrict(lockedDist);
+    if (lockedSt) setVerifiedState(lockedSt);
+
+    // Pre-populate ONLY within the user's registered profile district
     const initLocation = async () => {
       if (user.pincode && /^[1-9][0-9]{5}$/.test(user.pincode)) {
-        await handlePinLookup(user.pincode, user.village);
+        await handlePinLookup(user.pincode, user.village, lockedDist);
         return;
       }
       try {
         const cached = localStorage.getItem(VERIFIED_LOCATION_STORAGE_KEY);
         if (cached) {
           const parsed = JSON.parse(cached);
-          if (parsed?.pincode) {
+          const matchesProfile =
+            !lockedDist || areDistrictsMatching(parsed?.district, lockedDist, lockedSt);
+          if (parsed?.pincode && matchesProfile) {
             setPincode(parsed.pincode);
-            await handlePinLookup(parsed.pincode, parsed.village);
+            if (Array.isArray(parsed.postOffices) && parsed.postOffices.length > 0) {
+              setPostOffices(parsed.postOffices);
+              setVerifiedState(lockedSt || parsed.state || '');
+              setVerifiedDistrict(lockedDist || parsed.district || '');
+              setSelectedVillage(parsed.village || parsed.postOffices[0].Name);
+              setIsPinVerified(true);
+            } else {
+              await handlePinLookup(parsed.pincode, parsed.village, lockedDist || parsed.district);
+            }
           }
         }
       } catch (e) {
@@ -99,6 +120,7 @@ export default function NewPostPage() {
       }
     };
     initLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, router]);
 
   // Clean up camera stream on unmount
@@ -110,16 +132,23 @@ export default function NewPostPage() {
     };
   }, []);
 
-  const handlePinLookup = async (pinToVerify: string, preferredVillage?: string) => {
+  const handlePinLookup = async (
+    pinToVerify: string,
+    preferredVillage?: string,
+    preferredDistrict?: string
+  ) => {
     const clean = pinToVerify.replace(/\D/g, '').slice(0, 6);
     setPincode(clean);
+
+    const lockedDist = user?.district?.trim() || '';
+    const lockedSt = (user?.state as State) || '';
 
     if (clean.length < 6) {
       setIsPinVerified(false);
       setPostOffices([]);
       setSelectedVillage('');
-      setVerifiedState('');
-      setVerifiedDistrict('');
+      setVerifiedState(lockedSt);
+      setVerifiedDistrict(lockedDist);
       setPinError(null);
       return;
     }
@@ -133,21 +162,63 @@ export default function NewPostPage() {
       setIsPinVerified(false);
       setPostOffices([]);
       setSelectedVillage('');
-      setVerifiedState('');
-      setVerifiedDistrict('');
+      setVerifiedState(lockedSt);
+      setVerifiedDistrict(lockedDist);
       setPinError(isTelugu ? result.errorTe || 'తప్పు పిన్ కోడ్' : result.errorEn || 'Invalid Pin Code');
+      return;
+    }
+
+    // Strict check: Pin Code MUST belong to the user's registered profile district
+    if (lockedDist) {
+      const matchingOffices = result.postOffices.filter((po) =>
+        areDistrictsMatching(po.District, lockedDist, lockedSt || result.state)
+      );
+      const pinMatchesProfile =
+        areDistrictsMatching(result.district, lockedDist, lockedSt || result.state) ||
+        matchingOffices.length > 0;
+
+      // Allow the exact pincode the user registered with during onboarding/profile creation
+      const isUserRegisteredPin = Boolean(user?.pincode && user.pincode === clean);
+
+      if (!pinMatchesProfile && !isUserRegisteredPin) {
+        setIsPinVerified(false);
+        setPostOffices([]);
+        setSelectedVillage('');
+        setVerifiedState(lockedSt);
+        setVerifiedDistrict(lockedDist);
+        setPinError(
+          isTelugu
+            ? `ఈ పిన్ కోడ్ '${result.district}' జిల్లాకు చెందినది. మీ ప్రొఫైల్ జిల్లా '${lockedDist}' మాత్రమే అనుమతించబడుతుంది — వేరే జిల్లాలో పోస్ట్ చేయలేరు.`
+            : `This Pin Code belongs to '${result.district}' district. Only your profile district '${lockedDist}' is allowed.`
+        );
+        return;
+      }
+
+      const allowedOffices = matchingOffices.length > 0 ? matchingOffices : result.postOffices;
+      setIsPinVerified(true);
+      setVerifiedState(lockedSt || result.state);
+      setPostOffices(allowedOffices);
+
+      const matchedOffice =
+        preferredVillage &&
+        allowedOffices.find((po) => po.Name.toLowerCase() === preferredVillage.toLowerCase());
+      const chosenOffice = matchedOffice || allowedOffices[0];
+      setSelectedVillage(chosenOffice?.Name || '');
+      // Always keep district strictly locked to profile district
+      setVerifiedDistrict(lockedDist);
       return;
     }
 
     setIsPinVerified(true);
     setVerifiedState(result.state);
-    setVerifiedDistrict(result.district);
     setPostOffices(result.postOffices);
 
     const matchedOffice =
       preferredVillage &&
       result.postOffices.find((po) => po.Name.toLowerCase() === preferredVillage.toLowerCase());
-    setSelectedVillage(matchedOffice ? matchedOffice.Name : result.postOffices[0]?.Name || '');
+    const chosenOffice = matchedOffice || result.postOffices[0];
+    setSelectedVillage(chosenOffice?.Name || '');
+    setVerifiedDistrict(preferredDistrict || chosenOffice?.District || result.district);
   };
 
   const handleUseGpsLocation = async () => {
@@ -166,25 +237,41 @@ export default function NewPostPage() {
       return;
     }
 
+    const lockedDist = user?.district?.trim() || '';
+    const lockedSt = (user?.state as State) || '';
+
+    // Strict check: Block GPS location if it detects a different district than the user's profile district
+    if (lockedDist && gps.district && !areDistrictsMatching(gps.district, lockedDist, lockedSt || gps.state)) {
+      const msg = isTelugu
+        ? `GPS లో '${gps.district}' జిల్లా గుర్తించబడింది, కానీ మీ ప్రొఫైల్ జిల్లా '${lockedDist}'. వేరే జిల్లాలో పశువును పోస్ట్ చేయడానికి అవకాశం లేదు.`
+        : `GPS detected '${gps.district}' district, but your profile is registered in '${lockedDist}'. You can only post in '${lockedDist}'.`;
+      setPinError(msg);
+      setVerifiedDistrict(lockedDist);
+      setVerifiedState(lockedSt);
+      toast({
+        variant: 'destructive',
+        title: isTelugu ? 'వేరే జిల్లా అనుమతించబడదు' : 'Different District Not Allowed',
+        description: msg,
+      });
+      return;
+    }
+
     if (gps.pincode) {
       setPincode(gps.pincode);
     }
-    if (gps.state) {
-      setVerifiedState(gps.state);
-    }
-    if (gps.district) {
-      setVerifiedDistrict(gps.district);
-    }
+    setVerifiedState(lockedSt || gps.state || '');
+    setVerifiedDistrict(lockedDist || gps.district || '');
+
     if (gps.postOffices && gps.postOffices.length > 0) {
       setPostOffices(gps.postOffices);
       setSelectedVillage(gps.village || gps.postOffices[0].Name);
       setIsPinVerified(true);
-    } else if (gps.village && gps.district) {
+    } else if (gps.village && (lockedDist || gps.district)) {
       const syntheticOffice: PostalOfficeItem = {
         Name: gps.village,
-        Block: gps.district,
-        District: gps.district,
-        State: gps.state || 'Telangana',
+        Block: lockedDist || gps.district || '',
+        District: lockedDist || gps.district || '',
+        State: lockedSt || gps.state || 'Telangana',
         Pincode: gps.pincode || '500001',
       };
       setPostOffices([syntheticOffice]);
@@ -194,7 +281,7 @@ export default function NewPostPage() {
 
     toast({
       title: isTelugu ? 'GPS చిరునామా ధ్రువీకరించబడింది ✓' : 'GPS Address Verified ✓',
-      description: `${gps.village || ''}, ${gps.district || ''} (${gps.pincode || ''})`,
+      description: `${gps.village || ''}, ${lockedDist || gps.district || ''} (${gps.pincode || ''})`,
     });
   };
 
@@ -310,14 +397,13 @@ export default function NewPostPage() {
           videoRef.current.play().catch((err) => console.error('Video play error:', err));
         }
       }, 100);
-    } catch (err) {
-      console.error('Camera permission error:', err);
+    } catch {
       toast({
         variant: 'destructive',
         title: isTelugu ? 'కెమెరా అనుమతి అవసరం' : 'Camera Permission Denied',
         description: isTelugu
-          ? 'కెమెరాతో ఫోటో తీయడానికి దయచేసి బ్రౌజర్‌లో కెమెరా అనుమతి ఇవ్వండి.'
-          : 'Please allow camera permission in your browser settings.',
+          ? 'కెమెరాతో ఫోటో తీయడానికి దయచేసి బ్రౌజర్‌లో కెమెరా అనుమతి ఇవ్వండి లేదా గ్యాలరీ ఉపయోగించండి.'
+          : 'Please allow camera permission in your browser settings or use Gallery.',
       });
     }
   };
@@ -379,6 +465,18 @@ export default function NewPostPage() {
       return;
     }
 
+    const finalDistrict = profileDistrict || verifiedDistrict;
+    if (profileDistrict && !areDistrictsMatching(verifiedDistrict, profileDistrict, profileState)) {
+      toast({
+        variant: 'destructive',
+        title: isTelugu ? 'జిల్లా సరిపోలడం లేదు' : 'District Mismatch',
+        description: isTelugu
+          ? `మీ ప్రొఫైల్ జిల్లా '${profileDistrict}' లో మాత్రమే పశువును పోస్ట్ చేయగలరు.`
+          : `You can only post animals in your registered profile district '${profileDistrict}'.`,
+      });
+      return;
+    }
+
     if (priceError || !price) {
       toast({
         variant: 'destructive',
@@ -397,8 +495,8 @@ export default function NewPostPage() {
         ? (formData.get('otherBreed') as string) || 'Desi'
         : breedValue || 'Desi';
 
-    const fullLocation = `${selectedVillage}, ${verifiedDistrict}`;
-    const title = `${finalBreed} ${selectedCategory} in ${verifiedDistrict}`;
+    const fullLocation = `${selectedVillage}, ${finalDistrict}`;
+    const title = `${finalBreed} ${selectedCategory} in ${finalDistrict}`;
 
     const years = parseInt(selectedYears, 10);
     const months = parseInt(selectedMonths, 10);
@@ -417,9 +515,9 @@ export default function NewPostPage() {
       breed: finalBreed,
       age: ageString.trim(),
       price: Number(price),
-      location: verifiedDistrict,
+      location: finalDistrict,
       desc:
-        `${description ? description + ' — ' : ''}చిరునామా: ${fullLocation}, ${verifiedState} (${pincode})`.trim(),
+        `${description ? description + ' — ' : ''}చిరునామా: ${fullLocation}, ${verifiedState || profileState} (${pincode})`.trim(),
       imageUrl: verifiedImageUri,
       imageHint: `${finalBreed} ${selectedCategory}`,
       status: 'active',
@@ -729,6 +827,17 @@ export default function NewPostPage() {
                 </Button>
               </div>
 
+              {profileDistrict && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-semibold">
+                  <Lock className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <span>
+                    {isTelugu
+                      ? `మీ ప్రొఫైల్ జిల్లా '${profileDistrict}' లాక్ చేయబడింది. ఈ జిల్లాలోని పిన్ కోడ్ / గ్రామం మాత్రమే అనుమతించబడుతుంది.`
+                      : `Locked to your Profile District: ${profileDistrict}. Only Pin Codes and villages in this district are allowed.`}
+                  </span>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="pincode" className="text-sm font-semibold">
@@ -766,7 +875,15 @@ export default function NewPostPage() {
                   </Label>
                   <Select
                     value={selectedVillage}
-                    onValueChange={setSelectedVillage}
+                    onValueChange={(val) => {
+                      setSelectedVillage(val);
+                      if (!profileDistrict) {
+                        const po = postOffices.find((item) => item.Name === val);
+                        if (po?.District) {
+                          setVerifiedDistrict(po.District);
+                        }
+                      }
+                    }}
                     disabled={!isPinVerified || postOffices.length === 0}
                     required
                   >
@@ -796,23 +913,25 @@ export default function NewPostPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">
-                    {isTelugu ? 'జిల్లా (Verified District - Locked)' : 'Verified District (Auto-Locked)'}
+                  <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Lock className="w-3 h-3 text-emerald-700" />
+                    {isTelugu ? 'జిల్లా (Profile District - Locked)' : 'Profile District (Locked)'}
                   </Label>
                   <Input
-                    value={verifiedDistrict}
+                    value={profileDistrict || verifiedDistrict}
                     readOnly
                     disabled
-                    placeholder={isTelugu ? 'పిన్ కోడ్ ద్వారా ఆటోమేటిక్‌గా వస్తుంది' : 'Auto-filled from Pin Code'}
+                    placeholder={isTelugu ? 'ప్రొఫైల్ జిల్లా ఆటోమేటిక్‌గా వస్తుంది' : 'Locked to profile district'}
                     className="bg-muted font-semibold h-9"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">
-                    {isTelugu ? 'రాష్ట్రం (Verified State - Locked)' : 'Verified State (Auto-Locked)'}
+                  <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Lock className="w-3 h-3 text-emerald-700" />
+                    {isTelugu ? 'రాష్ట్రం (Profile State - Locked)' : 'Profile State (Locked)'}
                   </Label>
                   <Input
-                    value={verifiedState}
+                    value={profileState || verifiedState}
                     readOnly
                     disabled
                     placeholder={isTelugu ? 'పిన్ కోడ్ ద్వారా ఆటోమేటిక్‌గా వస్తుంది' : 'Auto-filled from Pin Code'}
@@ -904,7 +1023,12 @@ export default function NewPostPage() {
                 )}
                 {isTelugu ? 'పశువును అమ్మకానికి పోస్ట్ చేయండి' : 'Post Verified Animal for Sale'}
               </Button>
-              <Button type="button" variant="outline" className="h-12" onClick={() => router.back()}>
+              <Button
+                type="button"
+                variant="destructive"
+                className="h-12 px-6 bg-red-600 hover:bg-red-700 text-white font-bold text-base shadow-md"
+                onClick={() => router.back()}
+              >
                 {isTelugu ? 'రద్దు' : 'Cancel'}
               </Button>
             </div>

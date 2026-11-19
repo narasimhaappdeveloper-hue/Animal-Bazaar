@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import MyUploads from '@/components/my-uploads';
 import type { Animal } from '@/lib/definitions';
-import { Mail, Phone, User, LogOut, MapPin, Edit3, ShieldCheck, CheckCircle2, PlusCircle, Heart } from 'lucide-react';
+import { Mail, Phone, User, LogOut, MapPin, Edit3, ShieldCheck, PlusCircle, Heart, PhoneIncoming, ArrowRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { getFavorites, getStoredAnimals } from '@/lib/animals';
+import { getFavorites, getStoredAnimals, getCallRequests, SYNC_EVENT_NAME } from '@/lib/animals';
 import AnimalCard from './animal-card';
 
 export default function ProfileClient({ myUploads: initialUploads }: { myUploads: Animal[] }) {
@@ -26,6 +26,7 @@ export default function ProfileClient({ myUploads: initialUploads }: { myUploads
 
   const [uploads, setUploads] = useState<Animal[]>(initialUploads);
   const [favoriteAnimals, setFavoriteAnimals] = useState<Animal[]>([]);
+  const [pendingCallRequestsCount, setPendingCallRequestsCount] = useState(0);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
@@ -35,25 +36,39 @@ export default function ProfileClient({ myUploads: initialUploads }: { myUploads
   useEffect(() => {
     if (!loading && !user) {
       router.push('/login');
+      return;
     }
-    if (user) {
-      setEditName(user.name);
-      setEditPhone(user.phone);
-      setEditVillage(user.village || '');
-      setEditDistrict(user.district || '');
+    if (!user) return;
 
-      // Refresh stored uploads
+    setEditName(user.name);
+    setEditPhone(user.phone);
+    setEditVillage(user.village || '');
+    setEditDistrict(user.district || '');
+
+    const syncProfileData = () => {
       const allAnimals = getStoredAnimals();
       const userPosts = allAnimals.filter(
         (a) => a.uid === user.uid || (user.phone && a.userPhone === user.phone)
       );
       setUploads(userPosts);
 
-      // Load favorites
       const favIds = getFavorites();
       const favList = allAnimals.filter((a) => favIds.includes(a.id));
       setFavoriteAnimals(favList);
-    }
+
+      const pendingReqs = getCallRequests({ sellerUid: user.uid }).filter(
+        (r) => r.status === 'pending'
+      );
+      setPendingCallRequestsCount(pendingReqs.length);
+    };
+
+    syncProfileData();
+    window.addEventListener(SYNC_EVENT_NAME, syncProfileData);
+    window.addEventListener('storage', syncProfileData);
+    return () => {
+      window.removeEventListener(SYNC_EVENT_NAME, syncProfileData);
+      window.removeEventListener('storage', syncProfileData);
+    };
   }, [user, loading, router]);
 
   if (loading || !user) {
@@ -70,8 +85,6 @@ export default function ProfileClient({ myUploads: initialUploads }: { myUploads
     updateProfile({
       name: editName,
       phone: editPhone,
-      village: editVillage,
-      district: editDistrict,
     });
     setIsEditDialogOpen(false);
     toast({
@@ -85,6 +98,35 @@ export default function ProfileClient({ myUploads: initialUploads }: { myUploads
 
   return (
     <div className="space-y-6">
+      {pendingCallRequestsCount > 0 && (
+        <Card className="border-amber-300 bg-amber-50 shadow-sm">
+          <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-amber-200/80 flex items-center justify-center text-amber-900">
+                <PhoneIncoming className="h-5 w-5 animate-pulse" />
+              </div>
+              <div>
+                <p className="font-bold text-sm text-amber-950">
+                  {isTelugu
+                    ? `మీకు ${pendingCallRequestsCount} కొత్త కాల్ రిక్వెస్ట్‌లు వచ్చాయి (Animal Bazaar)`
+                    : `You have ${pendingCallRequestsCount} pending Call Request(s) via Animal Bazaar`}
+                </p>
+                <p className="text-xs text-amber-800">
+                  {isTelugu
+                    ? 'మీరు ఆమోదిస్తేనే కొనుగోలుదారు Animal Bazaar పేరుతో కాల్ చేయగలరు.'
+                    : 'Accept a request so the buyer can connect via masked Animal Bazaar call.'}
+                </p>
+              </div>
+            </div>
+            <Button asChild size="sm" className="bg-amber-600 hover:bg-amber-700 text-white font-semibold shrink-0">
+              <Link href="/notifications">
+                {isTelugu ? 'రిక్వెస్ట్‌లు చూడండి' : 'Review Requests'}
+                <ArrowRight className="ml-1.5 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
       {/* Header Profile Summary Banner */}
       <Card className="bg-gradient-to-r from-emerald-800 to-primary text-white border-none shadow-md overflow-hidden">
         <CardContent className="p-6">
@@ -154,19 +196,27 @@ export default function ProfileClient({ myUploads: initialUploads }: { myUploads
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
-                        <Label htmlFor="editVillage">{isTelugu ? 'గ్రామం/పట్టణం' : 'Village'}</Label>
+                        <Label htmlFor="editVillage" className="text-muted-foreground">
+                          {isTelugu ? 'గ్రామం (లాక్ చేయబడింది)' : 'Village (Locked)'}
+                        </Label>
                         <Input
                           id="editVillage"
                           value={editVillage}
-                          onChange={(e) => setEditVillage(e.target.value)}
+                          readOnly
+                          disabled
+                          className="bg-muted font-medium"
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <Label htmlFor="editDistrict">{isTelugu ? 'జిల్లా' : 'District'}</Label>
+                        <Label htmlFor="editDistrict" className="text-muted-foreground">
+                          {isTelugu ? 'జిల్లా (లాక్ చేయబడింది)' : 'District (Locked)'}
+                        </Label>
                         <Input
                           id="editDistrict"
                           value={editDistrict}
-                          onChange={(e) => setEditDistrict(e.target.value)}
+                          readOnly
+                          disabled
+                          className="bg-muted font-medium"
                         />
                       </div>
                     </div>

@@ -3,15 +3,21 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { formatDistanceToNow } from 'date-fns';
-import { useState, useEffect } from 'react';
-import type { Animal } from '@/lib/definitions';
+import { useState, useEffect, useCallback } from 'react';
+import type { Animal, CallRequest } from '@/lib/definitions';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatPrice } from '@/lib/utils';
-import { Calendar, MapPin, Heart, Phone } from 'lucide-react';
+import { Calendar, MapPin, Heart, PhoneCall, XCircle } from 'lucide-react';
 import { AnimalIcon } from './animal-icon';
-import { getFavorites, toggleFavorite } from '@/lib/animals';
+import {
+  getFavorites,
+  toggleFavorite,
+  getCallRequestForBuyerAndAnimal,
+  getCallRequests,
+  SYNC_EVENT_NAME,
+} from '@/lib/animals';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 
@@ -20,15 +26,52 @@ type AnimalCardProps = {
 };
 
 export default function AnimalCard({ animal }: AnimalCardProps) {
-  const { language } = useAuth();
+  const { user, language } = useAuth();
   const { toast } = useToast();
   const isTelugu = language === 'te';
+  const fallbackImage = 'https://images.unsplash.com/photo-1695902878213-f555035ac175?auto=format&fit=crop&w=800&q=80';
+  const [imgSrc, setImgSrc] = useState(animal.imageUrl);
   const [isFav, setIsFav] = useState(false);
+  const [callRequest, setCallRequest] = useState<CallRequest | null>(null);
+  const [sellerPendingCount, setSellerPendingCount] = useState(0);
 
   useEffect(() => {
+    setImgSrc(animal.imageUrl);
+  }, [animal.imageUrl]);
+
+  const syncCardState = useCallback(() => {
     const favs = getFavorites();
     setIsFav(favs.includes(animal.id));
-  }, [animal.id]);
+
+    if (!user) {
+      setCallRequest(null);
+      setSellerPendingCount(0);
+      return;
+    }
+
+    if (user.uid === animal.uid) {
+      setCallRequest(null);
+      const pendingForAnimal = getCallRequests({ sellerUid: user.uid }).filter(
+        (r) => r.animalId === animal.id && r.status === 'pending'
+      );
+      setSellerPendingCount(pendingForAnimal.length);
+    } else {
+      setSellerPendingCount(0);
+      setCallRequest(getCallRequestForBuyerAndAnimal(user.uid, animal.id));
+    }
+  }, [user, animal.id, animal.uid]);
+
+  useEffect(() => {
+    syncCardState();
+    window.addEventListener(SYNC_EVENT_NAME, syncCardState);
+    window.addEventListener('storage', syncCardState);
+    const poll = setInterval(syncCardState, 2000);
+    return () => {
+      window.removeEventListener(SYNC_EVENT_NAME, syncCardState);
+      window.removeEventListener('storage', syncCardState);
+      clearInterval(poll);
+    };
+  }, [syncCardState]);
 
   const handleToggleFav = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -49,13 +92,18 @@ export default function AnimalCard({ animal }: AnimalCardProps) {
         <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
           <Link href={`/post/${animal.id}`} className="block w-full h-full">
             <Image
-              src={animal.imageUrl}
+              src={imgSrc}
               alt={animal.title}
               fill
               className="object-cover transition-transform duration-300 group-hover:scale-105"
               data-ai-hint={animal.imageHint}
               referrerPolicy="no-referrer"
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+              onError={() => {
+                if (imgSrc !== fallbackImage) {
+                  setImgSrc(fallbackImage);
+                }
+              }}
             />
           </Link>
 
@@ -88,6 +136,46 @@ export default function AnimalCard({ animal }: AnimalCardProps) {
               {formatPrice(animal.price)}
             </div>
           </div>
+
+          {/* Live Call Request Status Indicator Chip on Card Image */}
+          {callRequest && animal.status !== 'closed' && (
+            <div className="absolute bottom-2.5 right-2.5 z-10">
+              {callRequest.status === 'accepted' ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-950/90 border border-emerald-400/70 px-2.5 py-1 text-[11px] font-bold text-emerald-100 shadow-md backdrop-blur-sm">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+                  </span>
+                  {isTelugu ? 'కాల్ సిద్ధం' : 'Call Active'}
+                </span>
+              ) : callRequest.status === 'pending' ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-950/90 border border-amber-400/70 px-2.5 py-1 text-[11px] font-bold text-amber-100 shadow-md backdrop-blur-sm">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400" />
+                  </span>
+                  {isTelugu ? 'రిక్వెస్ట్ పెండింగ్' : 'Call Pending'}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full bg-red-950/90 border border-red-400/70 px-2.5 py-1 text-[11px] font-bold text-red-100 shadow-md backdrop-blur-sm">
+                  <XCircle className="h-3 w-3 text-red-400" />
+                  {isTelugu ? 'తిరస్కరించబడింది' : 'Call Declined'}
+                </span>
+              )}
+            </div>
+          )}
+
+          {sellerPendingCount > 0 && (
+            <div className="absolute bottom-2.5 right-2.5 z-10">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-950/90 border border-amber-400/70 px-2.5 py-1 text-[11px] font-bold text-amber-100 shadow-md backdrop-blur-sm">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400" />
+                </span>
+                {isTelugu ? `${sellerPendingCount} కాల్ రిక్వెస్ట్` : `${sellerPendingCount} Call Req`}
+              </span>
+            </div>
+          )}
         </div>
 
         <CardContent className="p-4 pb-2">
@@ -112,6 +200,34 @@ export default function AnimalCard({ animal }: AnimalCardProps) {
               </div>
             )}
           </div>
+
+          {/* Descriptive Call Status Chip */}
+          {callRequest && animal.status !== 'closed' && (
+            <div className="mt-2.5">
+              {callRequest.status === 'accepted' ? (
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-300 px-2.5 py-1 text-[11px] font-semibold text-emerald-800">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600" />
+                  </span>
+                  {isTelugu ? 'కాల్ ఆమోదించబడింది — Call Seller Now సిద్ధం' : 'Call Accepted — Ready to Call'}
+                </div>
+              ) : callRequest.status === 'pending' ? (
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-300 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                  </span>
+                  {isTelugu ? 'కాల్ రిక్వెస్ట్ పెండింగ్‌లో ఉంది' : 'Call Request Pending Approval'}
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-red-50 border border-red-200 px-2.5 py-1 text-[11px] font-semibold text-red-700">
+                  <span className="inline-flex rounded-full h-2 w-2 bg-red-500" />
+                  {isTelugu ? 'కాల్ రిక్వెస్ట్ తిరస్కరించబడింది' : 'Call Request Rejected'}
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </div>
 
@@ -122,11 +238,20 @@ export default function AnimalCard({ animal }: AnimalCardProps) {
         </div>
 
         <div className="flex items-center gap-1.5">
-          <Button asChild size="sm" variant="default" className="h-8 text-xs font-semibold px-3">
-            <Link href={`/post/${animal.id}`}>
-              {isTelugu ? 'వివరాలు' : 'View Details'}
-            </Link>
-          </Button>
+          {callRequest?.status === 'accepted' && animal.status !== 'closed' ? (
+            <Button asChild size="sm" className="h-8 text-xs font-semibold px-3 bg-emerald-600 hover:bg-emerald-700 text-white">
+              <Link href={`/post/${animal.id}`}>
+                <PhoneCall className="w-3.5 h-3.5 mr-1" />
+                {isTelugu ? 'కాల్ చేయండి' : 'Call Now'}
+              </Link>
+            </Button>
+          ) : (
+            <Button asChild size="sm" variant="default" className="h-8 text-xs font-semibold px-3">
+              <Link href={`/post/${animal.id}`}>
+                {isTelugu ? 'వివరాలు' : 'View Details'}
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
     </Card>

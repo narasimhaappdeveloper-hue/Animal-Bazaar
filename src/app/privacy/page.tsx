@@ -11,13 +11,13 @@ export default function PrivacyPolicyPage() {
         <CardContent className="space-y-4 text-sm text-muted-foreground">
           <p className='font-semibold text-foreground'>Last updated: {new Date().toLocaleDateString()}</p>
 
-          <p>Your privacy is important to us. It is Animal Bazaar's policy to respect your privacy regarding any information we may collect from you across our website, and other sites we own and operate.</p>
+          <p>Your privacy is important to us. It is Animal Bazaar&apos;s policy to respect your privacy regarding any information we may collect from you across our website, and other sites we own and operate.</p>
           
           <h3 className="text-lg font-semibold text-foreground pt-2">Information We Collect</h3>
           <p>We only ask for personal information when we truly need it to provide a service to you. We collect it by fair and lawful means, with your knowledge and consent. We also let you know why we’re collecting it and how it will be used.</p>
           
           <h3 className="text-lg font-semibold text-foreground pt-2">Log Data</h3>
-          <p>We want to inform you that whenever you visit our Service, we collect information that your browser sends to us that is called Log Data. This Log Data may include information such as your computer’s Internet Protocol ("IP") address, browser version, pages of our Service that you visit, the time and date of your visit, the time spent on those pages, and other statistics.</p>
+          <p>We want to inform you that whenever you visit our Service, we collect information that your browser sends to us that is called Log Data. This Log Data may include information such as your computer’s Internet Protocol (&quot;IP&quot;) address, browser version, pages of our Service that you visit, the time and date of your visit, the time spent on those pages, and other statistics.</p>
 
           <h3 className="text-lg font-semibold text-foreground pt-2">Security</h3>
           <p>We value your trust in providing us your Personal Information, thus we are striving to use commercially acceptable means of protecting it. But remember that no method of transmission over the internet, or method of electronic storage is 100% secure and reliable, and we cannot guarantee its absolute security.</p>

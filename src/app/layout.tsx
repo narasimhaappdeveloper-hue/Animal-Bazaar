@@ -6,6 +6,7 @@ import Header from '@/components/header';
 import FloatingAddButton from '@/components/floating-add-button';
 import AdPlaceholder from '@/components/ad-placeholder';
 import PermissionsOnboarding from '@/components/permissions-onboarding';
+import MaskedCallOverlay from '@/components/masked-call-overlay';
 import { cn } from '@/lib/utils';
 import { AnalyticsProvider } from '@/context/analytics-provider';
 
@@ -39,6 +40,7 @@ export default function RootLayout({
               <FloatingAddButton />
               <AdPlaceholder />
               <PermissionsOnboarding />
+              <MaskedCallOverlay />
             </div>
             <Toaster />
           </AuthProvider>

@@ -11,12 +11,12 @@ export default function TermsOfServicePage() {
         <CardContent className="space-y-4 text-sm text-muted-foreground">
           <p className='font-semibold text-foreground'>Last updated: {new Date().toLocaleDateString()}</p>
           
-          <p>Welcome to Animal Bazaar! These terms and conditions outline the rules and regulations for the use of Animal Bazaar's Website, located at this domain.</p>
+          <p>Welcome to Animal Bazaar! These terms and conditions outline the rules and regulations for the use of Animal Bazaar&apos;s Website, located at this domain.</p>
 
           <p>By accessing this website we assume you accept these terms and conditions. Do not continue to use Animal Bazaar if you do not agree to take all of the terms and conditions stated on this page.</p>
 
           <h3 className="text-lg font-semibold text-foreground pt-2">Cookies</h3>
-          <p>We employ the use of cookies. By accessing Animal Bazaar, you agreed to use cookies in agreement with the Animal Bazaar's Privacy Policy.</p>
+          <p>We employ the use of cookies. By accessing Animal Bazaar, you agreed to use cookies in agreement with the Animal Bazaar&apos;s Privacy Policy.</p>
 
           <h3 className="text-lg font-semibold text-foreground pt-2">License</h3>
           <p>Unless otherwise stated, Animal Bazaar and/or its licensors own the intellectual property rights for all material on Animal Bazaar. All intellectual property rights are reserved. You may access this from Animal Bazaar for your own personal use subjected to restrictions set in these terms and conditions.</p>

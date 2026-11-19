@@ -16,7 +16,7 @@ export default function AboutPage() {
               Welcome to Animal Bazaar, the best place to buy and sell animals online.
             </p>
             <p>
-              Our mission is to connect farmers, breeders, and pet lovers in a simple, trustworthy, and efficient marketplace. Whether you're looking to expand your livestock, find a new family pet, or sell your animals, Animal Bazaar is here to help.
+              Our mission is to connect farmers, breeders, and pet lovers in a simple, trustworthy, and efficient marketplace. Whether you&apos;re looking to expand your livestock, find a new family pet, or sell your animals, Animal Bazaar is here to help.
             </p>
           </div>
 
@@ -24,16 +24,16 @@ export default function AboutPage() {
             <h2 className="text-2xl font-semibold text-center text-foreground mb-4">How to Use the App</h2>
             <ol className="list-decimal list-inside space-y-4 text-left max-w-lg mx-auto">
               <li>
-                <span className="font-semibold text-foreground">Create an Account:</span> Sign up or log in to get started. You'll need an account to sell animals and contact sellers.
+                <span className="font-semibold text-foreground">Create an Account:</span> Sign up or log in to get started. You&apos;ll need an account to sell animals and contact sellers.
               </li>
               <li>
                 <span className="font-semibold text-foreground">Browse Animals:</span> Use the search and filter options on the home page to find the perfect animal. You can filter by category, location, and more.
               </li>
               <li>
-                <span className="font-semibold text-foreground">Post an Ad:</span> Click the '+' button to post an animal for sale. Fill in the details, upload a clear photo, and set your price. Our AI will help validate your image.
+                <span className="font-semibold text-foreground">Post an Ad:</span> Click the &apos;+&apos; button to post an animal for sale. Fill in the details, upload a clear photo, and set your price. Our AI will help validate your image.
               </li>
               <li>
-                <span className="font-semibold text-foreground">Contact Sellers:</span> When you find an animal you're interested in, you can directly call the farmer or chat on WhatsApp with zero middleman commission. You can also send customized price offers.
+                <span className="font-semibold text-foreground">Contact Sellers:</span> When you find an animal you&apos;re interested in, you can directly call the farmer or chat on WhatsApp with zero middleman commission. You can also send customized price offers.
               </li>
             </ol>
           </div>
@@ -47,17 +47,17 @@ export default function AboutPage() {
                 <ol className="list-decimal list-inside space-y-2 mt-2">
                   <li>Open the Animal Bazaar website in your Chrome browser.</li>
                   <li>Tap the three-dot menu icon in the top-right corner.</li>
-                  <li>Select 'Add to Home screen'.</li>
-                  <li>Confirm the name and tap 'Add'.</li>
+                  <li>Select &apos;Add to Home screen&apos;.</li>
+                  <li>Confirm the name and tap &apos;Add&apos;.</li>
                 </ol>
               </div>
               <div>
                 <h4 className="font-semibold text-foreground">For iOS (using Safari):</h4>
                 <ol className="list-decimal list-inside space-y-2 mt-2">
                   <li>Open the Animal Bazaar website in your Safari browser.</li>
-                  <li>Tap the 'Share' icon (a square with an arrow pointing up).</li>
-                  <li>Scroll down and select 'Add to Home Screen'.</li>
-                  <li>Confirm the name and tap 'Add' in the top-right corner.</li>
+                  <li>Tap the &apos;Share&apos; icon (a square with an arrow pointing up).</li>
+                  <li>Scroll down and select &apos;Add to Home Screen&apos;.</li>
+                  <li>Confirm the name and tap &apos;Add&apos; in the top-right corner.</li>
                 </ol>
               </div>
             </div>

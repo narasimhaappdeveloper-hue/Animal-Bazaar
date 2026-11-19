@@ -67,7 +67,7 @@ export const initialAnimals: Animal[] = [
     price: 110000,
     location: 'Chittoor',
     desc: 'Authentic pure lineage Punganur dwarf cow. High medicinal milk value, very affectionate, ideal for natural farming & gopuja.',
-    imageUrl: 'https://images.unsplash.com/photo-1527153857715-3908f2ae5e81?auto=format&fit=crop&w=800&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1695902878213-f555035ac175?auto=format&fit=crop&w=800&q=80',
     imageHint: 'desi cow',
     status: 'active',
     createdAt: Date.now() - 4 * 24 * 60 * 60 * 1000,
@@ -200,6 +200,15 @@ export const animals: Animal[] = [...initialAnimals];
 const STORAGE_KEY = 'animal_bazaar_posts';
 const FAVORITES_KEY = 'animal_bazaar_favorites';
 const NOTIFICATIONS_KEY = 'animal_bazaar_notifications';
+const CALL_REQUESTS_KEY = 'animal_bazaar_call_requests';
+const MASKED_CALLS_KEY = 'animal_bazaar_masked_calls';
+
+export const SYNC_EVENT_NAME = 'animal_bazaar_sync';
+
+function emitSyncEvent() {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new Event(SYNC_EVENT_NAME));
+}
 
 export function getStoredAnimals(): Animal[] {
   if (typeof window === 'undefined') {
@@ -212,7 +221,20 @@ export function getStoredAnimals(): Animal[] {
       return initialAnimals;
     }
     const parsed: Animal[] = JSON.parse(raw);
-    return parsed;
+    const brokenUrl = 'photo-1527153857715-3908f2ae5e81';
+    const fixedCowUrl = 'https://images.unsplash.com/photo-1695902878213-f555035ac175?auto=format&fit=crop&w=800&q=80';
+    let didRepair = false;
+    const repaired = parsed.map((item) => {
+      if (item.imageUrl && item.imageUrl.includes(brokenUrl)) {
+        didRepair = true;
+        return { ...item, imageUrl: fixedCowUrl };
+      }
+      return item;
+    });
+    if (didRepair) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(repaired));
+    }
+    return repaired;
   } catch (err) {
     console.error('Failed to parse animals from localStorage:', err);
     return animals;
@@ -226,6 +248,7 @@ export function saveAnimalsToStorage(posts: Animal[]): void {
     // sync in-memory array
     animals.length = 0;
     animals.push(...posts);
+    emitSyncEvent();
   } catch (err) {
     console.error('Failed to save animals to localStorage:', err);
   }
@@ -274,6 +297,7 @@ export function toggleFavorite(id: string): boolean {
       isNowFavorite = true;
     }
     localStorage.setItem(FAVORITES_KEY, JSON.stringify(updated));
+    emitSyncEvent();
     return isNowFavorite;
   } catch (err) {
     console.error('Failed to toggle favorite in storage:', err);
@@ -303,6 +327,7 @@ export function addNotification(item: NotificationItem): void {
     const list = getStoredNotifications();
     const updated = [item, ...list];
     localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(updated));
+    emitSyncEvent();
   } catch (err) {
     console.error('Failed to save notification to storage:', err);
   }
@@ -314,7 +339,207 @@ export function markNotificationRead(id: string): void {
     const list = getStoredNotifications();
     const updated = list.map(n => (n.id === id ? { ...n, read: true } : n));
     localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(updated));
+    emitSyncEvent();
   } catch (err) {
     console.error('Failed to mark notification as read:', err);
   }
+}
+
+// Call Request & Approval Persistence (Privacy-Preserving: Zero Phone Exposure)
+export function getCallRequests(filter?: { sellerUid?: string; buyerUid?: string }): import('./definitions').CallRequest[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(CALL_REQUESTS_KEY);
+    const list: import('./definitions').CallRequest[] = raw ? JSON.parse(raw) : [];
+    if (filter?.sellerUid) {
+      return list.filter((r) => r.sellerUid === filter.sellerUid);
+    }
+    if (filter?.buyerUid) {
+      return list.filter((r) => r.buyerUid === filter.buyerUid);
+    }
+    return list;
+  } catch (err) {
+    console.error('Failed to read call requests:', err);
+    return [];
+  }
+}
+
+export function getCallRequestForBuyerAndAnimal(
+  buyerUid: string,
+  animalId: string
+): import('./definitions').CallRequest | null {
+  const list = getCallRequests({ buyerUid });
+  return list.find((r) => r.animalId === animalId) || null;
+}
+
+export function createCallRequest(params: {
+  animal: Animal;
+  buyerUid: string;
+}): import('./definitions').CallRequest {
+  const all = getCallRequests();
+  const existing = all.find(
+    (r) => r.animalId === params.animal.id && r.buyerUid === params.buyerUid
+  );
+  if (existing && existing.status !== 'rejected') {
+    return existing;
+  }
+
+  const now = Date.now();
+  const reqId = 'callreq_' + now.toString(36) + Math.random().toString(36).slice(2, 6);
+  const newReq: import('./definitions').CallRequest = {
+    id: reqId,
+    animalId: params.animal.id,
+    animalTitle: params.animal.title,
+    sellerUid: params.animal.uid,
+    buyerUid: params.buyerUid,
+    buyerLabel: 'Animal Bazaar',
+    status: 'pending',
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const filtered = existing ? all.filter((r) => r.id !== existing.id) : all;
+  localStorage.setItem(CALL_REQUESTS_KEY, JSON.stringify([newReq, ...filtered]));
+
+  // Send privacy-masked notification to Seller (shows Animal Bazaar, NO phone number)
+  addNotification({
+    id: 'notif_' + now.toString(36),
+    userId: params.animal.uid,
+    title: `Animal Bazaar — కొత్త కాల్ రిక్వెస్ట్ (Call Request)`,
+    message: `'${params.animal.title}' కోసం Animal Bazaar ద్వారా కాల్ అభ్యర్థన వచ్చింది. మీరు అంగీకరిస్తేనే కాల్ కనెక్ట్ అవుతుంది.`,
+    type: 'call_request',
+    createdAt: now,
+    read: false,
+    animalId: params.animal.id,
+    callRequestId: reqId,
+    senderName: 'Animal Bazaar',
+  });
+
+  emitSyncEvent();
+  return newReq;
+}
+
+export function respondToCallRequest(
+  requestId: string,
+  decision: 'accepted' | 'rejected'
+): import('./definitions').CallRequest | null {
+  if (typeof window === 'undefined') return null;
+  const all = getCallRequests();
+  let updatedReq: import('./definitions').CallRequest | null = null;
+  const now = Date.now();
+
+  const updated = all.map((r) => {
+    if (r.id === requestId) {
+      updatedReq = { ...r, status: decision, updatedAt: now };
+      return updatedReq;
+    }
+    return r;
+  });
+
+  localStorage.setItem(CALL_REQUESTS_KEY, JSON.stringify(updated));
+
+  if (updatedReq) {
+    const reqObj = updatedReq as import('./definitions').CallRequest;
+    // Mark seller notification read
+    const notifs = getStoredNotifications();
+    const updatedNotifs = notifs.map((n) =>
+      n.callRequestId === requestId ? { ...n, read: true } : n
+    );
+    localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(updatedNotifs));
+
+    // Notify buyer of decision (only showing "Animal Bazaar", never seller phone)
+    addNotification({
+      id: 'notif_resp_' + now.toString(36),
+      userId: reqObj.buyerUid,
+      title:
+        decision === 'accepted'
+          ? 'Animal Bazaar — కాల్ అభ్యర్థన ఆమోదించబడింది ✓'
+          : 'Animal Bazaar — కాల్ అభ్యర్థన తిరస్కరించబడింది',
+      message:
+        decision === 'accepted'
+          ? `'${reqObj.animalTitle}' కోసం మీ కాల్ రిక్వెస్ట్ ఆమోదించబడింది. ఇప్పుడు మీరు "Call Seller Now" ద్వారా Animal Bazaar పేరుతో మాట్లాడవచ్చు.`
+          : `'${reqObj.animalTitle}' కోసం మీ కాల్ రిక్వెస్ట్ ప్రస్తుతానికి తిరస్కరించబడింది.`,
+      type: decision === 'accepted' ? 'call_accepted' : 'call_rejected',
+      createdAt: now,
+      read: false,
+      animalId: reqObj.animalId,
+      callRequestId: reqObj.id,
+      senderName: 'Animal Bazaar',
+    });
+  }
+
+  emitSyncEvent();
+  return updatedReq;
+}
+
+// Masked In-App Call Session Management (Both parties see only "Animal Bazaar")
+export function getMaskedCalls(): import('./definitions').MaskedCallSession[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(MASKED_CALLS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function startMaskedCall(params: {
+  requestId: string;
+  animalId: string;
+  animalTitle: string;
+  callerUid: string;
+  calleeUid: string;
+}): import('./definitions').MaskedCallSession {
+  const now = Date.now();
+  const session: import('./definitions').MaskedCallSession = {
+    id: 'mcall_' + now.toString(36) + Math.random().toString(36).slice(2, 5),
+    requestId: params.requestId,
+    animalId: params.animalId,
+    animalTitle: params.animalTitle,
+    callerUid: params.callerUid,
+    calleeUid: params.calleeUid,
+    status: 'ringing',
+    startedAt: now,
+  };
+
+  const existing = getMaskedCalls().filter((c) => c.status !== 'ended');
+  localStorage.setItem(MASKED_CALLS_KEY, JSON.stringify([session, ...existing]));
+  emitSyncEvent();
+  return session;
+}
+
+export function updateMaskedCallStatus(
+  callId: string,
+  status: 'connected' | 'ended'
+): import('./definitions').MaskedCallSession | null {
+  const all = getMaskedCalls();
+  let target: import('./definitions').MaskedCallSession | null = null;
+  const updated = all.map((c) => {
+    if (c.id === callId) {
+      target = {
+        ...c,
+        status,
+        connectedAt: status === 'connected' ? c.connectedAt || Date.now() : c.connectedAt,
+      };
+      return target;
+    }
+    return c;
+  });
+  localStorage.setItem(MASKED_CALLS_KEY, JSON.stringify(updated));
+  emitSyncEvent();
+  return target;
+}
+
+export function getActiveMaskedCallForUser(
+  uid: string
+): import('./definitions').MaskedCallSession | null {
+  const now = Date.now();
+  // Consider calls active within the last 30 minutes that aren't ended
+  const active = getMaskedCalls().filter(
+    (c) =>
+      c.status !== 'ended' &&
+      now - c.startedAt < 30 * 60 * 1000 &&
+      (c.calleeUid === uid || c.callerUid === uid)
+  );
+  return active[0] || null;
 }

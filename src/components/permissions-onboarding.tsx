@@ -88,8 +88,9 @@ export default function PermissionsOnboarding() {
         stream.getTracks().forEach((track) => track.stop());
         camGranted = true;
         setCameraOk(true);
-      } catch (camErr) {
-        console.error('Camera permission not granted during onboarding:', camErr);
+      } catch {
+        // User denied camera or device has no camera; gallery upload remains available
+        camGranted = false;
       }
     }
 
@@ -108,8 +109,9 @@ export default function PermissionsOnboarding() {
         setDetectedPlace(summary);
         localStorage.setItem(VERIFIED_LOCATION_STORAGE_KEY, JSON.stringify(gpsResult));
       }
-    } catch (locErr) {
-      console.error('Location permission error during onboarding:', locErr);
+    } catch {
+      // Fallback to 6-digit Pin Code verification in forms
+      locGranted = false;
     }
 
     // 4. Trigger PWA install prompt if available
@@ -117,8 +119,8 @@ export default function PermissionsOnboarding() {
       try {
         await deferredPrompt.prompt();
         setDeferredPrompt(null);
-      } catch (installErr) {
-        console.error('Install prompt error:', installErr);
+      } catch {
+        // Install prompt dismissed or unsupported
       }
     }
 

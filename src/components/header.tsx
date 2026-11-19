@@ -18,7 +18,7 @@ import { Logo } from './icons/logo';
 import { useRouter } from 'next/navigation';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { useEffect, useState } from 'react';
-import { getStoredNotifications } from '@/lib/animals';
+import { getStoredNotifications, SYNC_EVENT_NAME } from '@/lib/animals';
 
 export default function Header() {
   const { user, logout, loading, language, setLanguage } = useAuth();
@@ -28,13 +28,27 @@ export default function Header() {
   const isTelugu = language === 'te';
 
   useEffect(() => {
-    if (user) {
+    if (!user) {
+      setUnreadCount(0);
+      return;
+    }
+
+    const syncUnread = () => {
       const notifs = getStoredNotifications(user.uid);
       const unread = notifs.filter((n) => !n.read).length;
       setUnreadCount(unread);
-    } else {
-      setUnreadCount(0);
-    }
+    };
+
+    syncUnread();
+    window.addEventListener(SYNC_EVENT_NAME, syncUnread);
+    window.addEventListener('storage', syncUnread);
+    const poll = setInterval(syncUnread, 2000);
+
+    return () => {
+      window.removeEventListener(SYNC_EVENT_NAME, syncUnread);
+      window.removeEventListener('storage', syncUnread);
+      clearInterval(poll);
+    };
   }, [user]);
 
   const toggleLanguage = () => {
