@@ -1,0 +1,7 @@
+{
+  "name": "Animal Bazaar - పశువుల బజార్",
+  "description": "Real livestock & animal marketplace to buy and sell cows, buffaloes, goats, sheep, and country animals.",
+  "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"],
+  "requestFramePermissions": ["camera", "geolocation"]
+}
