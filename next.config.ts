@@ -1,14 +1,20 @@
-import type {NextConfig} from 'next';
+
+import type { NextConfig } from 'next';
+import { initOpenNextCloudflareForDev } from '@opennextjs/cloudflare';
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+
   /* config options here */
+
   typescript: {
     ignoreBuildErrors: true,
   },
+
   eslint: {
     ignoreDuringBuilds: true,
   },
+
   images: {
     remotePatterns: [
       {
@@ -32,5 +38,7 @@ const nextConfig: NextConfig = {
     ],
   },
 };
+
+initOpenNextCloudflareForDev();
 
 export default nextConfig;
